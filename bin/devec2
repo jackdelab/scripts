@@ -1,0 +1,68 @@
+#!/bin/bash -e
+
+# Variables
+EC2_NAME="${EC2_NAME:-jack-dev}"
+SSH_KEYFILE="${SSH_KEYFILE:-~/.ssh/jack-dev}"
+
+usage () {
+    echo "Usage:"
+    echo "    $0 status                     : get the current status of the instance"
+    echo "    $0 up                         : start the instance, if it is stopped"
+    echo "    $0 down                       : stop the instance, if it is running"
+    echo "    $0 login                      : connect to the instance"
+    echo "    $0 --help                     : print this message and quit"
+}
+
+if [[ $# -lt 1 ]]; then
+    echo "Illegal number of parameters"
+    usage
+    exit 2
+fi
+
+instance_addr() {
+    aws ec2 describe-instances \
+        --filters \
+        "Name=tag:Name,Values=${EC2_NAME}" \
+        --query 'Reservations[*].Instances[*].[PrivateIpAddress]' \
+        --output text
+}
+
+instance_id() {
+    aws ec2 describe-instances \
+        --filters \
+        "Name=tag:Name,Values=${EC2_NAME}" \
+        --query 'Reservations[*].Instances[*].InstanceId' \
+        --output text
+}
+
+case $1 in
+    status)
+        echo "Checking status for EC2 ${EC2_NAME}..."
+        id=$(instance_id)
+        echo "Status for ${id}:"
+        aws ec2 describe-instances \
+            --query 'Reservations[*].Instances[*].State.Name' \
+            --output text \
+            --instance-ids "${id}"
+    ;;
+    up)
+        echo "Starting EC2 ${EC2_NAME}..."
+        aws ec2 start-instances --instance-ids "$(instance_id)"
+    ;;
+    down)
+        echo "Stopping EC2 ${EC2_NAME}..."
+        aws ec2 stop-instances --instance-ids "$(instance_id)"
+    ;;
+    login)
+        echo "SSH into EC2 ${EC2_NAME}..."
+        echo ""
+        echo ""
+        ssh -i "${SSH_KEYFILE}" "ec2-user@$(instance_addr)"
+        echo ""
+        echo ""
+        echo "Disconnected, remember to run $0 down to stop the instance when done."
+    ;;
+    *)
+        usage
+    ;;
+esac

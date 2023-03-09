@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# Vars
+env=${ENV_VAR}
+region=${AWS_REGION:-dev}
+account=${AWS_ACCOUNT:-dev}
+tenant=${TENANT_NAME:-ntrinsec}
+vault_addr=${VAULT_ADDR:-$(kubectl get "services/vault-server-${env}" -o go-template='{{(index.spec.clusterIP)}}')}
+
+# Set appropriate path in consul backend storage.
+if [[ $tenant = "ntrinsec" ]]; then
+  vault_name="${tenant}_${region}_vault_$env"
+else
+  vault_name="${tenant}_${region}_vault"
+fi

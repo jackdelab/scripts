@@ -1,0 +1,27 @@
+#!/bin/bash -e
+
+GIT_BRANCH=$(git branch --show-current)
+TOP_LEVEL=$(git rev-parse --show-toplevel)
+macd_dir=$TOP_LEVEL/terraform/macd/$GIT_BRANCH
+mkdir -p "${macd_dir}"
+
+next_subdir=$(( $(bash -c "cd ${macd_dir} && find . -type d | tail +2 | cut -d '/' -f 2 | sort --version-sort | tail -1") + 1 ))
+subdir="${macd_dir}/${next_subdir}"
+mkdir -p "${subdir}"
+
+audit_file="${subdir}/macd.txt"
+{ echo "MACD generated from:"; pwd; echo ""; } >> "${audit_file}"
+if [[ $1 = "-destroy" ]]; then
+    terragrunt_args="-destroy"
+    { echo "MACD generated in destroy mode"; echo ""; } >> "${audit_file}"
+fi
+{ echo "Last commit:"; git log -n 1; echo ""; echo "Current changes:";\
+    bash -c "cd $TOP_LEVEL && git status -s -uall ./terraform/{modules,providers}";\
+    echo ""; } >> "${audit_file}"
+
+if [[ $terragrunt_args ]]; then
+    terragrunt run-all plan "${terragrunt_args}" -out "${subdir}/plan-all.zip" > "${subdir}/plan-all.txt"
+else
+    terragrunt run-all plan -out "${subdir}/plan-all.zip" > "${subdir}/plan-all.txt"
+fi
+

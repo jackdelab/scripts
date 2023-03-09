@@ -1,0 +1,3 @@
+#!/bin/bash -e
+
+aws codepipeline list-pipelines | jq ".pipelines[].name" -r | xargs -L 1 bash -c 'for arg do echo $arg; aws codepipeline get-pipeline --name $arg | jq ".pipeline.stages[0].actions[0].configuration.BranchName" -r; echo ""; done' _

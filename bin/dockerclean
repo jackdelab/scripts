@@ -1,0 +1,9 @@
+#!/bin/bash
+
+echo "Pruning images older than 336 hours..."
+docker image prune -a --force --filter "until=336h"
+echo "Pruning system..."
+echo "y" | docker system prune
+echo "Removing unused volumes..."
+docker volume ls | tail +2 | awk '{print $ NF}' | xargs docker volume rm
+echo "docker cleanup complete."

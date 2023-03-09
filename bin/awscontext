@@ -1,0 +1,69 @@
+#!/bin/bash -e
+
+# Variables
+creds_file="$HOME/.aws/credentials"
+
+usage () {
+    echo "Usage:"
+    echo "    $0 <profile name>             : set <profile name> as the active profile"
+    echo "    $0 --list                     : list all available profile names"
+    echo "    $0 --rotate <profile name>    : refresh the key for the given profile"
+    echo "    $0 --help                     : print this message and quit"
+}
+
+if [[ $# -lt 1 ]]; then
+    echo "Illegal number of parameters"
+    usage
+    exit 2
+fi
+
+credfile_switch(){
+    AWS_PROFILE="$1"
+    key=$(awk "/${AWS_PROFILE}/ {p=1} p && /aws_access_key_id/ {print $ 0;exit;}" "${creds_file}")
+    secret=$(awk "/${AWS_PROFILE}/ {p=1} p && /aws_secret_access_key/ {print $ 0;exit;}" "${creds_file}")
+    gsed -i "2s|.*|${key}|" "${creds_file}"
+    gsed -i "3s|.*|${secret}|" "${creds_file}"
+    echo "Switched default AWS profile to ${AWS_PROFILE}"
+}
+
+profile_switch(){
+    export AWS_PROFILE="$1"
+    if aws sts get-caller-identity; then
+        credfile_switch "${AWS_PROFILE}"
+    else
+        echo "Failed to assume AWS profile ${AWS_PROFILE}"
+        exit 1
+    fi
+}
+
+case $1 in
+    --help)
+        usage
+    ;;
+    --list)
+        echo "Configured AWS profiles:"
+        grep -ie "\[.*\]" "${creds_file}" | grep -v default
+    ;;
+    --rotate)
+        export AWS_PROFILE="$2"
+        echo "Rotating key for ${AWS_PROFILE}"
+        profile_switch "${AWS_PROFILE}"
+        new_creds=$(aws iam create-access-key)
+        echo "Generated new key"
+        key=$(echo "${new_creds}" | jq -r ".AccessKey.AccessKeyId")
+        secret=$(echo "${new_creds}" | jq -r ".AccessKey.SecretAccessKey")
+        old_key=$(awk "/${AWS_PROFILE}/ {p=1} p && /aws_access_key_id/ {print $ NF;exit;}" "${creds_file}")
+        profile_line=$(awk "/${AWS_PROFILE}/ {print NR}" "${creds_file}")
+        key_line=$((profile_line + 1))
+        secret_line=$((profile_line + 2))
+        gsed -i "${key_line}s|.*|aws_access_key_id = ${key}|" "${creds_file}"
+        gsed -i "${secret_line}s|.*|aws_secret_access_key = ${secret}|" "${creds_file}"
+        # sleep 10
+        credfile_switch "${AWS_PROFILE}"
+        echo "The old key can now be deleted by running:"
+        echo "aws iam delete-access-key --access-key-id ${old_key}"
+    ;;
+    *)
+        profile_switch "$1"
+    ;;
+esac

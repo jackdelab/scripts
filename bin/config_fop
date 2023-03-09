@@ -1,0 +1,6 @@
+#!/bin/bash
+
+export CONFIG_FILE=/Users/jack/temp/fop.yaml
+export FOP_SQS_KEY=$(awk "/fopsqs/ {p=1} p && /aws_access_key_id/ {print $ NF;exit;}" "/Users/Jack/.aws/credentials")
+export FOP_SQS_SECRET=$(awk "/fopsqs/ {p=1} p && /aws_secret_access_key/ {print $ NF;exit;}" "/Users/Jack/.aws/credentials")
+export AZURE_AUTH_LOCATION=/Users/Jack/.azure/fop-azureauth.json

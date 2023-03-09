@@ -1,0 +1,12 @@
+#!/bin/bash
+
+dev_branch=$(git branch | grep -E '^[ *]*dev$' | awk -F " " '{print $NF}' )
+main_branch=$(git branch | grep -E '^[ *]*master$|^[ *]*main$' | awk -F " " '{print $NF}' )
+if [[ $dev_branch ]]; then
+    git branch --merged "${dev_branch}" | grep -v "${dev_branch}$" | grep -v "${main_branch}$" | xargs git branch -d
+else
+    git branch --merged "${main_branch}" | grep -v "${main_branch}$" | xargs git branch -d
+fi
+
+git fetch --prune
+git branch --all

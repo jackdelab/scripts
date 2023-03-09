@@ -1,0 +1,42 @@
+#!/bin/bash -e
+
+# Variables
+ssh_privkey="/Users/jack/.ssh/acme-infra"
+
+usage () {
+    echo "Usage:"
+    echo "    $0 <profile name>             : set <profile name> as the active profile"
+    echo "    $0 --list                     : list all available profile names"
+    echo "    $0 --rotate <profile name>    : refresh the key for the given profile"
+    echo "    $0 --help                     : print this message and quit"
+}
+
+if [[ $# -lt 1 ]]; then
+    echo "Illegal number of parameters"
+    usage
+    exit 2
+fi
+
+connect () {
+    pubip=$(steampipe query "select public_ip_address from aws_ec2_instance where private_ip_address = '$1';" --output json | jq -r '.[0].public_ip_address')
+    if [[ -z $pubip ]]; then
+        echo "No public IP found for instance with private ip $1"
+        exit 1
+    fi
+
+    if [[ $pubip = 'null' ]]; then
+        echo "No public IP found for instance with private ip $1"
+        exit 1
+    fi
+
+    ssh -t -i "${ssh_privkey}" "ec2-user@${pubip}" "bash -l"
+}
+
+case $1 in
+    --help)
+        usage
+    ;;
+    *)
+        connect "$1"
+    ;;
+esac

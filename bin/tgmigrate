@@ -1,0 +1,35 @@
+#!/bin/bash -e
+
+usage () {
+    echo "Usage:"
+    echo "    $0 <FROM DIR> <TO DIR> : migrate TF files from <FROM DIR> to <TO DIR>"
+}
+
+# Variables
+src_dir="$PWD/$1"
+dst_dir="$PWD/$2"
+backup_file="/tmp/backup.tfstate"
+
+if [[ $# -ne 2 ]]; then
+    echo "Illegal number of parameters"
+    usage
+    exit 2
+fi
+
+echo "Migrating TF files from ${src_dir} to ${dst_dir}"
+echo ""
+echo ""
+
+cd "${src_dir}" && terragrunt plan-all --detailed-exitcode || ( echo "TF state changes detected in ${src_dir}, exiting"; exit 1 )
+cd "${src_dir}" && terragrunt state pull > "${backup_file}"
+mv "${src_dir}"/* "${dst_dir}"
+cd "${dst_dir}" && terragrunt init
+cd "${dst_dir}" && terragrunt state push "${backup_file}"
+
+echo ""
+echo ""
+echo "Migration complete, ensure there are no state changes below."
+echo ""
+echo ""
+
+cd "${dst_dir}" && terragrunt plan-all 
