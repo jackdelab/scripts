@@ -1,0 +1,53 @@
+#! /bin/bash
+
+# get this from https://us-east-1.console.aws.amazon.com/iamv2/home#/security_credentials?section=IAM_credentials
+mfa_arn='arn:aws:iam::137199715083:mfa/jack_pixel_3'
+
+usage() {
+    echo "Usage:"
+    echo "${0} <MFA code> - generate AWS session credentials with an MFA OTP code."
+}
+
+mfa() {
+    mfa_code="${1}"
+    
+    # cleanup old session
+    unset AWS_ACCESS_KEY_ID
+    unset AWS_SECRET_ACCESS_KEY
+    unset AWS_SESSION_TOKEN
+
+    # get new session token
+    resp=$(aws sts get-session-token --duration-seconds 43200 --serial-number "${mfa_arn}" --token-code "${mfa_code}")
+    ret=$?
+    if [[ $ret != 0 ]] ; then
+        echo "failed to MFA to aws"
+        exit $ret
+    fi
+
+    echo "MFA successful, configuring session credentials"
+
+    session_id=$(echo "${resp}" | jq -r '.Credentials.AccessKeyId')
+    session_key=$(echo "${resp}" | jq -r '.Credentials.SecretAccessKey')
+    session_token=$(echo "${resp}" | jq -r '.Credentials.SessionToken')
+    session_expiration=$(echo "${resp}" | jq -r '.Credentials.Expiration')
+
+    export AWS_ACCESS_KEY_ID="${session_id}"
+    export AWS_SECRET_ACCESS_KEY="${session_key}"
+    export AWS_SESSION_TOKEN="${session_token}"
+    aws sts get-caller-identity
+    ret=$?
+    if [[ $ret != 0 ]] ; then
+        echo "failed to verify session identity"
+        exit $ret
+    fi
+
+    echo "session credentials configured, session expires at ${session_expiration}"
+}
+
+if [[ $# -lt 1 ]]; then
+    echo "Illegal number of parameters"
+    usage
+    exit 2
+fi
+
+mfa $1
