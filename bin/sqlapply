@@ -1,0 +1,29 @@
+#!/bin/bash
+set -e
+
+db="${DATABASE:=V2_OLTP}"
+
+usage() {
+    echo "usage: $0 <directory> <host> <username>"
+    echo "    set env var DATABASE to change target database from default"
+}
+
+if [[ $# -lt 3 ]]; then
+    echo "Illegal number of parameters"
+    usage
+    exit 2
+fi
+
+directory=$(readlink -f $1)
+host=$2
+username=$3
+echo "Running all SQL files in ${directory} on DB ${host} ${DATABASE}"
+read -s -p "Enter password for user ${username}: " password
+echo ""
+
+for f in "${directory}"/*.sql
+do
+    echo "Running ${f}..."
+    mysql -u "${username}" "-p${password}" -h "${host}" "${db}" < $f
+    echo "File ${f} ran successfully"
+done

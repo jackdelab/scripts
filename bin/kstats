@@ -1,0 +1,19 @@
+#!/bin/bash
+
+usage () {
+    echo "Usage:"
+    echo "    $0 pods-per-node  : show number of pods running on each node"
+}
+
+case $1 in
+    --help)
+        usage
+    ;;
+    pods-per-node)
+        kubectl get pod -A -o jsonpath='{range .items[?(@.spec.nodeName)]}{.spec.nodeName}{"\n"}{end}' | sort | uniq -c | sort -rn
+    ;;
+    *)
+        echo "Unknown command $1"
+        usage
+    ;;
+esac
