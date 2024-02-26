@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-db="${DATABASE:=V2_OLTP}"
+db="${DATABASE:=main}"
 
 usage() {
     echo "usage: $0 <directory> <host> <username>"
