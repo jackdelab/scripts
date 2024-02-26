@@ -1,0 +1,44 @@
+alias ls='ls --colo=auto'
+alias ll='ls -lah'
+alias cephaws='aws --profile ceph --ca-bundle /etc/ssl/certs/TodylRoot-cfssl.cer --endpoint-url https://datalake.todyl.com:8080'
+alias tf='terraform'
+alias apply='terraform apply'
+function fcd () { [ -f "$1" ] && { cd "$(dirname "$1")"; } || { cd "$1"; } ; pwd; }
+alias cd='fcd'
+alias vi='vim'
+alias awsmfa='awscontext todyl && awsmfa'
+alias vaultldap='vault login --method=ldap username=jack@todyl.com'
+alias gitroot='cd $(git rev-parse --show-toplevel)'
+
+# kubernetes aliases
+alias k='kubectl'
+alias kpod='kubectl get pod'
+alias klog='kubectl logs'
+alias kdesc='kubectl describe pod'
+alias knotrunning='kubectl get pods --field-selector status.phase!=Running'
+function kubecn() { ctx="${1:--c}"; ns="${2:--c}"; kubectx "${ctx}" && kubens "${ns}"; }
+function kmissing() {
+    kubectl get node -o name | sed 's|node/||g' | sort > /tmp/all
+    kubectl get pod -l "${1}" -o custom-columns=NODE:spec.nodeName --no-headers | grep -v '<none>' | sort > /tmp/present
+    comm -23 /tmp/all /tmp/present
+}
+
+# Something keeps putting the wrong one back into PATH earlier than this.
+# export PATH=/mnt/c/Users/jack/AppData/Local/Programs/Microsoft\ VS\ Code/bin:$PATH
+export PATH=$PATH:/home/jack/.vscode-server/bin/74f6148eb9ea00507ec113ec51c489d6ffb4b771/bin/remote-cli:/home/jack/bin:/home/jack/.local/bin:/home/jack/.tfenv/bin
+
+# color prompt
+PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+
+# 24 hour time format
+export LC_TIME=C.UTF-8
+
+export     HISTSIZE=20000
+export HISTFILESIZE=200000
+export  HISTCONTROL=ignoreboth:erasedups
+
+# Vault conection for Todyl vault
+export VAULT_ADDR='https://vault.todyl.com'
+
+# Setup thefuck command correction
+eval $(thefuck --alias)
