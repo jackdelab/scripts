@@ -1,7 +1,7 @@
 #! /bin/bash
 
-# get this from https://us-east-1.console.aws.amazon.com/iamv2/home#/security_credentials?section=IAM_credentials
-mfa_arn='arn:aws:iam::137199715083:mfa/jack_pixel_3'
+config_file="${HOME}/.aws/config.json"
+mfa_device="default"
 
 usage() {
     echo "Usage:"
@@ -15,6 +15,17 @@ mfa() {
     unset AWS_ACCESS_KEY_ID
     unset AWS_SECRET_ACCESS_KEY
     unset AWS_SESSION_TOKEN
+
+    # check if the last session is still valid
+    awscontext mfa
+    ret=$?
+    if [[ ${ret} == 0 ]] ; then
+        echo "MFA session still valid"
+        exit 0
+    fi
+
+    # lookup values from config
+    mfa_arn="$(jq -r .mfa_devices.${mfa_device} ${config_file})"
 
     # get new session token
     resp=$(aws sts get-session-token --duration-seconds 43200 --serial-number "${mfa_arn}" --token-code "${mfa_code}")
@@ -31,9 +42,10 @@ mfa() {
     session_token=$(echo "${resp}" | jq -r '.Credentials.SessionToken')
     session_expiration=$(echo "${resp}" | jq -r '.Credentials.Expiration')
 
-    export AWS_ACCESS_KEY_ID="${session_id}"
-    export AWS_SECRET_ACCESS_KEY="${session_key}"
-    export AWS_SESSION_TOKEN="${session_token}"
+    aws --profile mfa configure set aws_access_key_id "${session_id}"
+    aws --profile mfa configure set aws_secret_access_key "${session_key}"
+    aws --profile mfa configure set aws_session_token "${session_token}"
+
     aws sts get-caller-identity
     ret=$?
     if [[ $ret != 0 ]] ; then
@@ -41,12 +53,18 @@ mfa() {
         exit $ret
     fi
 
+    awscontext mfa
     echo "session credentials configured, session expires at ${session_expiration}"
 }
 
 if [[ $# -lt 1 ]]; then
     echo "Illegal number of parameters"
     usage
+    exit 2
+fi
+
+if [[ ! -f "${config_file}" ]] ; then
+    echo "Required config file ${config_file} not found!"
     exit 2
 fi
 
