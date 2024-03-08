@@ -1,0 +1,8 @@
+{
+    "mfa_devices": {
+        "default": "<ARN>"
+    },
+    "assumerole_aliases": {
+        "alias": "<arn>"
+    }
+}
