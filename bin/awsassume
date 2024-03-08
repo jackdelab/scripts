@@ -1,0 +1,79 @@
+#! /bin/bash
+
+config_file="${HOME}/.aws/config.json"
+mfa_device="default"
+
+usage() {
+    echo "Usage:"
+    echo "${0} <role alias> <MFA code> - start an AWS AssumeRole session with an MFA OTP code."
+}
+
+mfa() {
+    role_alias="${1}"
+    mfa_code="${2}"
+    
+    # cleanup old session
+    unset AWS_ACCESS_KEY_ID
+    unset AWS_SECRET_ACCESS_KEY
+    unset AWS_SESSION_TOKEN
+
+    # check if the last session is still valid
+    awscontext "${role_alias}"
+    ret=$?
+    if [[ ${ret} == 0 ]] ; then
+        echo "AssumeRole session for ${role_alias} still valid"
+        exit 0
+    fi
+
+    # lookup values from config
+    role_arn="$(jq -r .assumerole_aliases.${role_alias} ${config_file})"
+    mfa_arn="$(jq -r .mfa_devices.${mfa_device} ${config_file})"
+
+    # get new session token
+    resp=$(aws sts assume-role \
+        --role-arn ${role_arn} \
+        --role-session-name ${role_alias} \
+        --duration-seconds 43200 \
+        --serial-number "${mfa_arn}" \
+        --token-code "${mfa_code}" \
+    )
+    ret=$?
+    if [[ $ret != 0 ]] ; then
+        echo "failed to MFA to aws"
+        exit $ret
+    fi
+
+    echo "MFA successful, configuring session credentials"
+
+    session_id=$(echo "${resp}" | jq -r '.Credentials.AccessKeyId')
+    session_key=$(echo "${resp}" | jq -r '.Credentials.SecretAccessKey')
+    session_token=$(echo "${resp}" | jq -r '.Credentials.SessionToken')
+    session_expiration=$(echo "${resp}" | jq -r '.Credentials.Expiration')
+
+    aws --profile "${role_alias}" configure set aws_access_key_id "${session_id}"
+    aws --profile "${role_alias}" configure set aws_secret_access_key "${session_key}"
+    aws --profile "${role_alias}" configure set aws_session_token "${session_token}"
+
+    aws sts get-caller-identity
+    ret=$?
+    if [[ $ret != 0 ]] ; then
+        echo "failed to verify session identity"
+        exit $ret
+    fi
+
+    awscontext "${role_alias}"
+    echo "session credentials configured, session expires at ${session_expiration}"
+}
+
+if [[ $# -lt 2 ]]; then
+    echo "Illegal number of parameters"
+    usage
+    exit 2
+fi
+
+if [[ ! -f "${config_file}" ]] ; then
+    echo "Required config file ${config_file} not found!"
+    exit 2
+fi
+
+mfa $1 $2
