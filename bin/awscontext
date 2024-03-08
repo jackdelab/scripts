@@ -21,8 +21,10 @@ credfile_switch(){
     AWS_PROFILE="$1"
     key=$(awk "/${AWS_PROFILE}/ {p=1} p && /aws_access_key_id/ {print $ 0;exit;}" "${creds_file}")
     secret=$(awk "/${AWS_PROFILE}/ {p=1} p && /aws_secret_access_key/ {print $ 0;exit;}" "${creds_file}")
-    gsed -i "2s|.*|${key}|" "${creds_file}"
-    gsed -i "3s|.*|${secret}|" "${creds_file}"
+    token=$(awk "/${AWS_PROFILE}/ {p=1} p && /aws_session_token/ {print $ 0;exit;}" "${creds_file}")
+    sed -i "2s|.*|${key}|" "${creds_file}"
+    sed -i "3s|.*|${secret}|" "${creds_file}"
+    sed -i "4s|.*|${token}|" "${creds_file}"
     echo "Switched default AWS profile to ${AWS_PROFILE}"
 }
 
@@ -52,12 +54,15 @@ case $1 in
         echo "Generated new key"
         key=$(echo "${new_creds}" | jq -r ".AccessKey.AccessKeyId")
         secret=$(echo "${new_creds}" | jq -r ".AccessKey.SecretAccessKey")
+        token=""
         old_key=$(awk "/${AWS_PROFILE}/ {p=1} p && /aws_access_key_id/ {print $ NF;exit;}" "${creds_file}")
         profile_line=$(awk "/${AWS_PROFILE}/ {print NR}" "${creds_file}")
         key_line=$((profile_line + 1))
         secret_line=$((profile_line + 2))
-        gsed -i "${key_line}s|.*|aws_access_key_id = ${key}|" "${creds_file}"
-        gsed -i "${secret_line}s|.*|aws_secret_access_key = ${secret}|" "${creds_file}"
+        token_line=$((profile_line + 3))
+        sed -i "${key_line}s|.*|aws_access_key_id = ${key}|" "${creds_file}"
+        sed -i "${secret_line}s|.*|aws_secret_access_key = ${secret}|" "${creds_file}"
+        sed -i "${token_line}s|.*|aws_session_token = ${token}|" "${creds_file}"
         # sleep 10
         credfile_switch "${AWS_PROFILE}"
         echo "The old key can now be deleted by running:"
